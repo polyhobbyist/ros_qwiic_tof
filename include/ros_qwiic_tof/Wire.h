@@ -14,6 +14,7 @@ class TwoWire
     std::vector<uint8_t> _writeBuffer;
     std::vector<uint8_t> _readBuffer;
     size_t _readIndex;
+    uint16_t _lastAddress;
 
 
 public:

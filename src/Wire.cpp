@@ -108,36 +108,36 @@ void TwoWire::write(uint8_t* value, size_t len)
 
 uint32_t TwoWire::requestFrom(uint16_t id, size_t size)
 {
+    uint16_t regi = _lastAddress;
     if (_writeBuffer.size() == _i2cDevice.iaddr_bytes)
     {
-        _i2cDevice.bus = _i2cFileDescriptor;
-        _i2cDevice.addr = id;
-
-        _readIndex = 0;
-
-        _readBuffer.resize(size, 0);
-
-        uint16_t regi = _writeBuffer.data()[0]; // first byte is the full address or the upper byte in a 2 byte address.
+        regi = _writeBuffer.data()[0]; // first byte is the full address or the upper byte in a 2 byte address.
         if (_i2cDevice.iaddr_bytes == 2)
         {
             regi = regi << 8 | _writeBuffer.data()[1]; // second byte is the low address.
         }
-
-        int ret = i2c_ioctl_read(&_i2cDevice, regi, _readBuffer.data(), size);
-        if (ret == -1 || (size_t)ret != size)
-        {
-            RCLCPP_INFO(rclcpp::get_logger("i2c"), "failed to read status: [%d]", ret);
-
-            // Don't prop error code
-            ret = 0;
-        }
-
         _writeBuffer.clear();
-
-        return (size_t)ret;
     }
 
-    return 0;}
+    _i2cDevice.bus = _i2cFileDescriptor;
+    _i2cDevice.addr = id;
+
+    _readIndex = 0;
+
+    _readBuffer.resize(size, 0);
+
+    int ret = i2c_ioctl_read(&_i2cDevice, regi, _readBuffer.data(), size);
+    if (ret == -1 || (size_t)ret != size)
+    {
+        RCLCPP_INFO(rclcpp::get_logger("i2c"), "failed to read status: [%d]", ret);
+
+        // Don't prop error code
+        ret = 0;
+    }
+
+    _lastAddress = regi + size;
+    return (size_t)ret;
+}
 
 void TwoWire::setClock(uint32_t)
 {
