@@ -1,0 +1,3 @@
+[submodule "src/SparkFun_VL53L5CX_Arduino_Library"]
+	path = src/SparkFun_VL53L5CX_Arduino_Library
+	url = https://github.com/sparkfun/SparkFun_VL53L5CX_Arduino_Library
