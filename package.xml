@@ -10,6 +10,8 @@
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>geometry_msgs</depend>
   <depend>libboost-system-dev</depend>
   <depend>libi2c</depend>
   <depend>image_transport</depend>

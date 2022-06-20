@@ -25,9 +25,9 @@ endif()
 
 add_executable(${PROJECT_NAME} 
   src/main.cpp
-  src/SPI.cpp
-  src/Wire.cpp
-  src/Arduino.cpp
+  src/wiring_for_ros/SPI.cpp
+  src/wiring_for_ros/Wire.cpp
+  src/wiring_for_ros/Arduino.cpp
   src/SparkFun_VL53L5CX_Arduino_Library/src/SparkFun_VL53L5CX_IO.cpp
   src/SparkFun_VL53L5CX_Arduino_Library/src/SparkFun_VL53L5CX_Library.cpp
   src/SparkFun_VL53L5CX_Arduino_Library/src/vl53l5cx_api.cpp
@@ -66,14 +66,15 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(Boost REQUIRED system)
-find_package(image_transport REQUIRED)
-find_package(cv_bridge REQUIRED)
 
 include_directories(
   include/${PROJECT_NAME}
   ${SOURCE_DIR}/include
+  src/wiring_for_ros/include
   src/SparkFun_VL53L5CX_Arduino_Library/src
 )
 
@@ -81,8 +82,8 @@ ament_target_dependencies(${PROJECT_NAME}
   rclcpp
   std_msgs
   sensor_msgs
-  image_transport
-  cv_bridge
+  visualization_msgs
+  geometry_msgs
   Boost)
 
 install(TARGETS ${PROJECT_NAME}
