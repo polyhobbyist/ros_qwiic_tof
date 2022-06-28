@@ -62,17 +62,18 @@ class I2CPublisher : public rclcpp::Node
       get_parameter_or<uint8_t>("id", _id, 0x29); 
       get_parameter_or<std::string>("frame_id", _frameId, "depth"); 
       get_parameter_or<std::string>("topic", _topic, "points2"); 
-      get_parameter_or<double>("poll", _poll, 500.0);
+      get_parameter_or<double>("poll", _poll, 15.0);
       get_parameter_or<bool>("debug", _debug, false);
 
       
 
       Wire.begin();
-      Wire.setAddressSize(2);
-      myImager.begin();
+      Wire.setAddressSize(2); 
+      Wire.setPageBytes(256);
+      myImager.begin(_id, Wire);
       
       myImager.setResolution(kResolution * kResolution); //Enable all 64 pads
-      
+       
       myImager.startRanging();
 
       _pointcloud = this->create_publisher<sensor_msgs::msg::PointCloud2>(_topic, 1);
@@ -80,7 +81,6 @@ class I2CPublisher : public rclcpp::Node
       {
         _marker = this->create_publisher<visualization_msgs::msg::Marker>("tof_debug", 1);
       }
-  
       _timer = this->create_wall_timer(
         std::chrono::duration<double, std::milli>(_poll), 
         std::bind(&I2CPublisher::timer_callback, this));
@@ -93,7 +93,7 @@ class I2CPublisher : public rclcpp::Node
       if (myImager.isDataReady() == true)
       {
         VL53L5CX_ResultsData measurementData; // Result data class structure, 1356 byes of RAM
-        memset(&measurementData, 0, sizeof(VL53L5CX_ResultsData));
+        memset(&measurementData, 0, sizeof(VL53L5CX_ResultsData)); 
         if (myImager.getRangingData(&measurementData)) //Read distance data into array
         {
           auto point_cloud = sensor_msgs::msg::PointCloud2();
@@ -105,7 +105,7 @@ class I2CPublisher : public rclcpp::Node
           point_cloud.is_dense = false;
           point_cloud.is_bigendian = false;
 
-          sensor_msgs::PointCloud2Modifier pcd_modifier(point_cloud);
+          sensor_msgs::PointCloud2Modifier pcd_modifier(point_cloud);        
           pcd_modifier.setPointCloud2FieldsByString(1, "xyz");
 
           sensor_msgs::PointCloud2Iterator<float> iter_x(point_cloud, "x");
