@@ -59,7 +59,7 @@ class I2CPublisher : public rclcpp::Node
 
     void initialize()
     {
-      get_parameter_or<uint8_t>("id", _id, 0x29); 
+      get_parameter_or<uint8_t>("i2c_address", _id, 0x29); 
       get_parameter_or<std::string>("frame_id", _frameId, "depth"); 
       get_parameter_or<std::string>("topic", _topic, "points2"); 
       get_parameter_or<double>("poll", _poll, 15.0);
