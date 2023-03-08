@@ -16,6 +16,8 @@
   <depend>libi2c</depend>
   <depend>image_transport</depend>
   <depend>cv_bridge</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <test_depend>ament_lint_auto</test_depend>

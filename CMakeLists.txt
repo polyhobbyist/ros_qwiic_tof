@@ -57,8 +57,8 @@ ExternalProject_Add(libi2c
 ExternalProject_Get_property(libi2c SOURCE_DIR)
 
 message (STATUS "*** libi2c installed to ${SOURCE_DIR}")
-target_link_libraries(${PROJECT_NAME} ${SOURCE_DIR}/libi2c.so)
-
+target_link_libraries(${PROJECT_NAME} ${SOURCE_DIR}/libi2c.so  gpiod)
+add_dependencies(${PROJECT_NAME}  libi2c) 
 else()
 endif()
 
@@ -69,6 +69,8 @@ find_package(sensor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(Boost REQUIRED system)
 
 include_directories(
@@ -84,7 +86,10 @@ ament_target_dependencies(${PROJECT_NAME}
   sensor_msgs
   visualization_msgs
   geometry_msgs
-  Boost)
+  Boost
+  tf2
+  tf2_ros)
+
 
 install(TARGETS ${PROJECT_NAME}
     ARCHIVE DESTINATION lib
