@@ -25,13 +25,15 @@ SOFTWARE.
 #include <memory>
 #include <chrono>
 #include <math.h>
+#include <cstring>
 #include "rclcpp/rclcpp.hpp"
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <geometry_msgs/msg/point.hpp>
-#include "tf2/exceptions.h"
-#include "tf2_ros/transform_listener.h"
-#include "tf2_ros/buffer.h"
+#include <tf2/exceptions.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 #include "Arduino.h"
 #include "Wire.h"
@@ -67,29 +69,19 @@ class I2CPublisher : public rclcpp::Node
       get_parameter_or<bool>("debug", _debug, false);
 
       get_parameter_or<uint8_t>("multiplexer_address", _multiplexerId, 0); 
-      std::vector<int> ports;
+      std::vector<uint8_t> ports;
       std::vector<std::string> frameIds;
 
       if (_multiplexerId != 0)
       {
-        rclcpp::Parameter portParam;
-        if (get_parameter<std::vector<int>>("multiplexer_ports", portParam))
-        {
-          ports = portParam.as_integer_array();
-        }
-        else
+        if (!get_parameter<std::vector<uint8_t>>("multiplexer_ports", ports))
         {
           RCLCPP_FATAL(get_logger(), "If a multiplexer address is specified, ports must be specified as well");
           rclcpp::shutdown();
           return;
         }
 
-        rclcpp::Parameter frameIdParam;
-        if (get_parameter<std::vector<int>>("frame_ids", frameIdParam))
-        {
-          frameIds = frameIdParam.as_string_array();
-        }
-        else
+        if (!get_parameter<std::vector<std::string>>("frame_ids", frameIds))
         {
           RCLCPP_FATAL(get_logger(), "If a multiplexer address is specified, frame ids must be specified as well");
           rclcpp::shutdown();
@@ -111,24 +103,24 @@ class I2CPublisher : public rclcpp::Node
 
       _tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
 
-      _tf_listener = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);      
+      _tf_listener = std::make_unique<tf2_ros::TransformListener>(*_tf_buffer);      
 
       Wire.begin();
       Wire.setAddressSize(2); 
       Wire.setPageBytes(256);
       
-      for (size_t i = 0; i < _ports.size(); i++)
+      for (size_t i = 0; i < ports.size(); i++)
       {
         auto imagerInstance = std::make_shared<ImagerInstance>(frameIds[i], ports[i]);
         _imagers.push_back(imagerInstance);
 
-        switchToImager(imagerInstance.port);
+        switchToImager(imagerInstance->port);
 
-        imagerInstance.imager.begin(_id, Wire);
+        imagerInstance->imager.begin(_id, Wire);
         
-        imagerInstance.imager.setResolution(kResolution * kResolution); //Enable all 64 pads
+        imagerInstance->imager.setResolution(kResolution * kResolution); //Enable all 64 pads
         
-        imagerInstance.imager.startRanging();
+        imagerInstance->imager.startRanging();
       }
 
       _pointcloud = this->create_publisher<sensor_msgs::msg::PointCloud2>(_topic, 1);
@@ -151,7 +143,7 @@ class I2CPublisher : public rclcpp::Node
         return;
       }
 
-      if (i > 7) 
+      if (port > 7) 
       {
         return;
       }
@@ -165,14 +157,14 @@ class I2CPublisher : public rclcpp::Node
     {
       for (auto& imager : _imagers)
       {  
-        if (imager.isDataReady() == true)
+        if (imager->imager.isDataReady() == true)
         {
           // Store in local variable in case the range fails
           VL53L5CX_ResultsData measurementData; // Result data class structure, 1356 byes of RAM
           memset(&measurementData, 0, sizeof(VL53L5CX_ResultsData)); 
-          if (imager.getRangingData(&measurementData)) //Read distance data into array
+          if (imager->imager.getRangingData(&measurementData)) //Read distance data into array
           {
-            std::memmove(measurementData, imager.measurementData, sizeof(VL53L5CX_ResultsData));
+            std::memmove(&measurementData, &imager->measurementData, sizeof(VL53L5CX_ResultsData));
           }
         }
       }
@@ -197,23 +189,20 @@ class I2CPublisher : public rclcpp::Node
 
       for (auto& imager : _imagers)
       {
+        tf2::Transform tfTransform;
         geometry_msgs::msg::TransformStamped tMsg;
 
         if (_multiplexerId != 0)
         {
           try 
           {
-            tMsg = _tf_buffer->lookupTransform(_frameId, imager.frame, tf2::TimePointZero);
+            tMsg = _tf_buffer->lookupTransform(_frameId, imager->frameId, tf2::TimePointZero);
           } 
           catch (const tf2::TransformException & ex) 
           {
-            RCLCPP_INFO(
-              this->get_logger(), "Could not transform %s to %s: %s",
-              toFrameRel.c_str(), fromFrameRel.c_str(), ex.what());
             continue;
           }
 
-          tf2::Transform tfTransform;
           tf2::fromMsg(tMsg.transform, tfTransform);        
         }
 
@@ -221,7 +210,7 @@ class I2CPublisher : public rclcpp::Node
         {
           for (size_t h = 0; h < kResolution; h++)
           {
-            float depth = static_cast<float>(measurementData.distance_mm[w + (kResolution * h)]);
+            float depth = static_cast<float>(imager->measurementData.distance_mm[w + (kResolution * h)]);
 
             if (depth <= 0.0f)
             {
@@ -233,7 +222,7 @@ class I2CPublisher : public rclcpp::Node
               constexpr float kFov = DegToRad(45.0f);
               float fovPerPixel = kFov / static_cast<float>(kResolution);
 
-              tf2:Vector pt(
+              tf2::Vector3 pt(
                 kMillimeterToMeter * cos(w * fovPerPixel - kFov / 2.0f - DegToRad(90.0f)) * depth,
                 kMillimeterToMeter * sin(h * fovPerPixel - kFov / 2.0f) * depth,
                 kMillimeterToMeter * depth);
@@ -243,9 +232,9 @@ class I2CPublisher : public rclcpp::Node
                 pt = tfTransform * pt;
               }
 
-              *iter_x = static_cast<float>(pt.x);
-              *iter_y = static_cast<float>(pt.y);
-              *iter_z = static_cast<float>(pt.z);
+              *iter_x = pt.x();
+              *iter_y = pt.y();
+              *iter_z = pt.z();
             } 
 
             ++iter_x; ++iter_y; ++iter_z;
@@ -315,8 +304,8 @@ class I2CPublisher : public rclcpp::Node
 
     std::vector<std::shared_ptr<ImagerInstance>> _imagers;
 
-    tf2_ros::Buffer _tf_buffer;
-    tf2_ros::TransformListener _tf_listener;
+    std::unique_ptr<tf2_ros::Buffer> _tf_buffer;
+    std::unique_ptr<tf2_ros::TransformListener> _tf_listener;
 };
 
 int main(int argc, char * argv[])
