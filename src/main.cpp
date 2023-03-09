@@ -1,4 +1,4 @@
-7/*
+/*
 MIT License
 
 Copyright (c) 2022 Lou Amadio
@@ -32,7 +32,6 @@ SOFTWARE.
 #include "tf2/exceptions.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
-#include "turtlesim/srv/spawn.hpp"
 
 #include "Arduino.h"
 #include "Wire.h"
@@ -71,7 +70,7 @@ class I2CPublisher : public rclcpp::Node
       std::vector<int> ports;
       std::vector<std::string> frameIds;
 
-      if (_multiplexer_address != 0)
+      if (_multiplexerId != 0)
       {
         rclcpp::Parameter portParam;
         if (get_parameter<std::vector<int>>("multiplexer_ports", portParam))
@@ -145,9 +144,9 @@ class I2CPublisher : public rclcpp::Node
 
   private:
 
-    void switchToImager(uint_t port)
+    void switchToImager(uint8_t port)
     {
-      if (_multiplexer_address == 0)
+      if (_multiplexerId == 0)
       {
         return;
       }
@@ -157,7 +156,7 @@ class I2CPublisher : public rclcpp::Node
         return;
       }
       
-      Wire.beginTransmission(_multiplexer_address);
+      Wire.beginTransmission(_multiplexerId);
       Wire.write(1 << port);
       Wire.endTransmission();  
     }
@@ -200,7 +199,7 @@ class I2CPublisher : public rclcpp::Node
       {
         geometry_msgs::msg::TransformStamped tMsg;
 
-        if (_multiplexer_address != 0)
+        if (_multiplexerId != 0)
         {
           try 
           {
@@ -239,7 +238,7 @@ class I2CPublisher : public rclcpp::Node
                 kMillimeterToMeter * sin(h * fovPerPixel - kFov / 2.0f) * depth,
                 kMillimeterToMeter * depth);
 
-              if (_multiplexer_address != 0)
+              if (_multiplexerId != 0)
               {
                 pt = tfTransform * pt;
               }
@@ -294,7 +293,7 @@ class I2CPublisher : public rclcpp::Node
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr _pointcloud;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _marker;
     uint8_t _id;
-    uint8_t _multiplexerId
+    uint8_t _multiplexerId;
     double _poll;
     std::string _topic;
     std::string _frameId;
@@ -309,8 +308,8 @@ class I2CPublisher : public rclcpp::Node
 
       }
       SparkFun_VL53L5CX imager;
-      uint8_t port;
       std::string frameId;
+      uint8_t port;
       VL53L5CX_ResultsData measurementData; // Result data class structure, 1356 byes of RAM
     };
 
