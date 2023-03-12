@@ -69,19 +69,29 @@ class I2CPublisher : public rclcpp::Node
       get_parameter_or<bool>("debug", _debug, false);
 
       get_parameter_or<uint8_t>("multiplexer_address", _multiplexerId, 0); 
-      std::vector<uint8_t> ports;
+      std::vector<int64_t> ports;
       std::vector<std::string> frameIds;
+
+      rclcpp::Parameter param;
 
       if (_multiplexerId != 0)
       {
-        if (!get_parameter<std::vector<uint8_t>>("multiplexer_ports", ports))
+        if (get_parameter("multiplexer_ports", param ))
+        {
+          ports = param.as_integer_array();
+        }
+        else
         {
           RCLCPP_FATAL(get_logger(), "If a multiplexer address is specified, ports must be specified as well");
           rclcpp::shutdown();
           return;
         }
 
-        if (!get_parameter<std::vector<std::string>>("frame_ids", frameIds))
+        if (get_parameter("frame_ids", param))
+        {
+          frameIds = param.as_string_array();
+        }
+        else
         {
           RCLCPP_FATAL(get_logger(), "If a multiplexer address is specified, frame ids must be specified as well");
           rclcpp::shutdown();
@@ -111,7 +121,18 @@ class I2CPublisher : public rclcpp::Node
       
       for (size_t i = 0; i < ports.size(); i++)
       {
-        auto imagerInstance = std::make_shared<ImagerInstance>(frameIds[i], ports[i]);
+        byte port = 0;
+        if (ports[i] < 1 || ports[i] > 8)
+        {
+          RCLCPP_FATAL(get_logger(), "a port number was specified out of range [0,7]");
+          rclcpp::shutdown();
+        }
+        else
+        {
+          port = static_cast<uint8_t>(ports[i]);
+        }
+
+        auto imagerInstance = std::make_shared<ImagerInstance>(frameIds[i], port);
         _imagers.push_back(imagerInstance);
 
         switchToImager(imagerInstance->port);
@@ -143,14 +164,14 @@ class I2CPublisher : public rclcpp::Node
         return;
       }
 
-      if (port > 7) 
+      if (port > 8) 
       {
         return;
       }
       
       Wire.beginTransmission(_multiplexerId);
       Wire.write(1 << port);
-      Wire.endTransmission();  
+      Wire.endTransmission(true);  
     }
 
     void timer_callback()
@@ -164,7 +185,7 @@ class I2CPublisher : public rclcpp::Node
           memset(&measurementData, 0, sizeof(VL53L5CX_ResultsData)); 
           if (imager->imager.getRangingData(&measurementData)) //Read distance data into array
           {
-            std::memmove(&measurementData, &imager->measurementData, sizeof(VL53L5CX_ResultsData));
+            std::memmove(&imager->measurementData, &measurementData, sizeof(VL53L5CX_ResultsData));
           }
         }
       }

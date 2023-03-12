@@ -14,13 +14,13 @@ def generate_launch_description():
             parameters=[
                 {'frame_ids': ['depth1', 'depth2'] },
                 {'multiplexer_address':  112 },
-                {'multiplexer_ports': [0, 7] },
+                {'multiplexer_ports': [1, 8] },
             ]),
 
-        Node(package = "tf2_ros", 
-            executable = "static_transform_publisher",
-            arguments = ["0", "0", "0", "0", "0", "0", "depth", "depth1"]),
-        Node(package = "tf2_ros", 
-            executable = "static_transform_publisher",
-            arguments = ["0", "0", "0", "0", "0", "1.570796", "depth", "depth2"]),
+#        Node(package = "tf2_ros", 
+#            executable = "static_transform_publisher",
+#            arguments = ["0", "0", "0", "0", "0", "0", "depth", "depth1"]),
+#        Node(package = "tf2_ros", 
+#            executable = "static_transform_publisher",
+#            arguments = ["0", "0", "0", "0", "0", "1.570796", "depth", "depth2"]),
     ])
