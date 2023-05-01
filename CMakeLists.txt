@@ -58,6 +58,7 @@ ExternalProject_Get_property(libi2c SOURCE_DIR)
 
 message (STATUS "*** libi2c installed to ${SOURCE_DIR}")
 target_link_libraries(${PROJECT_NAME} ${SOURCE_DIR}/libi2c.so)
+add_dependencies(${PROJECT_NAME}  libi2c) 
 
 else()
 endif()
