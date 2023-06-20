@@ -6,9 +6,9 @@ if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
 endif()
 
-# Default to C++14
+# Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 if(MSVC)
@@ -71,6 +71,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(Boost REQUIRED system)
 
 include_directories(
@@ -88,7 +89,8 @@ ament_target_dependencies(${PROJECT_NAME}
   geometry_msgs
   Boost
   tf2
-  tf2_ros)
+  tf2_ros
+  tf2_geometry_msgs)
 
 
 install(TARGETS ${PROJECT_NAME}

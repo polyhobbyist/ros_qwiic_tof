@@ -33,7 +33,7 @@ SOFTWARE.
 #include <tf2/exceptions.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include "Arduino.h"
 #include "Wire.h"
@@ -62,13 +62,23 @@ class I2CPublisher : public rclcpp::Node
 
     void initialize()
     {
-      get_parameter_or<uint8_t>("i2c_address", _id, 0x29); 
-      get_parameter_or<std::string>("frame_id", _frameId, "depth"); 
-      get_parameter_or<std::string>("topic", _topic, "points2"); 
-      get_parameter_or<double>("poll", _poll, 15.0);
-      get_parameter_or<bool>("debug", _debug, false);
+      declare_parameter("i2c_address", 0x29);
+      declare_parameter("multiplexer_address", 0);
+      declare_parameter("frame_id", "depth");
+      declare_parameter("poll", 15.0);
+      declare_parameter("topic", "points2");
+      declare_parameter("debug", false);
+      declare_parameter("frame_ids", std::vector<std::string>());
+      declare_parameter("multiplexer_ports", std::vector<int64_t>());
 
-      get_parameter_or<uint8_t>("multiplexer_address", _multiplexerId, 0); 
+
+      _id = (uint8_t)(get_parameter("i2c_address").as_int()); 
+      _frameId = get_parameter("frame_id").as_string(); 
+      _topic = get_parameter("topic").as_string(); 
+      _poll = get_parameter("poll").as_double();
+      _debug = get_parameter("debug").as_bool();
+      _multiplexerId = (uint8_t)(get_parameter("multiplexer_address").as_int()); 
+
       std::vector<int64_t> ports;
       std::vector<std::string> frameIds;
 
@@ -76,7 +86,7 @@ class I2CPublisher : public rclcpp::Node
 
       if (_multiplexerId != 0)
       {
-        if (get_parameter("multiplexer_ports", param ))
+        if (get_parameter("multiplexer_ports", param))
         {
           ports = param.as_integer_array();
         }
@@ -113,19 +123,19 @@ class I2CPublisher : public rclcpp::Node
 
       _tf_buffer = std::make_unique<tf2_ros::Buffer>(this->get_clock());
 
-      _tf_listener = std::make_unique<tf2_ros::TransformListener>(*_tf_buffer);      
+      _tf_listener = std::make_unique<tf2_ros::TransformListener>(*_tf_buffer);
 
       Wire.begin();
-      Wire.setAddressSize(2); 
-      Wire.setPageBytes(256);
+      switchToImager(1);
       
       for (size_t i = 0; i < ports.size(); i++)
       {
-        byte port = 0;
-        if (ports[i] < 1 || ports[i] > 8)
+        uint8_t port = 0;
+        if (ports[i] < 0 || ports[i] > 7)
         {
           RCLCPP_FATAL(get_logger(), "a port number was specified out of range [0,7]");
           rclcpp::shutdown();
+          return;
         }
         else
         {
@@ -168,16 +178,26 @@ class I2CPublisher : public rclcpp::Node
       {
         return;
       }
+
+      Wire.setAddressSize(1); 
+      Wire.setPageBytes(4);
       
       Wire.beginTransmission(_multiplexerId);
+      Wire.write(0x0);
       Wire.write(1 << port);
       Wire.endTransmission(true);  
+
+      Wire.setAddressSize(2); 
+      Wire.setPageBytes(256);
+
     }
 
     void timer_callback()
     {
       for (auto& imager : _imagers)
       {  
+        switchToImager(imager->port);
+
         if (imager->imager.isDataReady() == true)
         {
           // Store in local variable in case the range fails
@@ -215,6 +235,12 @@ class I2CPublisher : public rclcpp::Node
 
         if (_multiplexerId != 0)
         {
+          if (!_tf_buffer->canTransform(_frameId, imager->frameId, tf2::TimePointZero))
+          {
+            RCLCPP_WARN(get_logger(), "Cannot transform from %s to %s", _frameId.c_str(), imager->frameId.c_str());
+            continue;
+          }
+
           try 
           {
             tMsg = _tf_buffer->lookupTransform(_frameId, imager->frameId, tf2::TimePointZero);
@@ -243,10 +269,28 @@ class I2CPublisher : public rclcpp::Node
               constexpr float kFov = DegToRad(45.0f);
               float fovPerPixel = kFov / static_cast<float>(kResolution);
 
+/*
+              tf2::Vector3 pt(
+                kMillimeterToMeter * depth * cos(w * fovPerPixel - kFov / 2.0f) * sin(h * fovPerPixel - kFov / 2.0f),
+                kMillimeterToMeter * depth * cos(h * fovPerPixel - kFov / 2.0f),
+                kMillimeterToMeter * depth * cos(w * fovPerPixel - kFov / 2.0f) * cos(h * fovPerPixel - kFov / 2.0f));
+*/
+
+            double alpha_h = w * fovPerPixel - kFov / 2.0f;
+            double alpha_v = h * fovPerPixel - kFov / 2.0f;
+
+            tf2::Vector3 pt(
+              depth * cos(alpha_v) * sin(alpha_h) * kMillimeterToMeter,
+              depth * cos(alpha_h) * sin(alpha_v) * kMillimeterToMeter,
+              depth * cos(alpha_v) * cos(alpha_h) * kMillimeterToMeter);
+              
+
+/*
               tf2::Vector3 pt(
                 kMillimeterToMeter * cos(w * fovPerPixel - kFov / 2.0f - DegToRad(90.0f)) * depth,
                 kMillimeterToMeter * sin(h * fovPerPixel - kFov / 2.0f) * depth,
                 kMillimeterToMeter * depth);
+              */
 
               if (_multiplexerId != 0)
               {
@@ -334,15 +378,6 @@ int main(int argc, char * argv[])
     rclcpp::init(argc, argv);
 
     auto node = std::make_shared<I2CPublisher>();
-    node->declare_parameter("i2c_address");
-    node->declare_parameter("multiplexer_address");
-    node->declare_parameter("frame_id");
-    node->declare_parameter("poll");
-    node->declare_parameter("topic");
-    node->declare_parameter("debug");
-    node->declare_parameter("frame_ids");
-    node->declare_parameter("multiplexer_ports");
-
     node->initialize();
 
     rclcpp::spin(node);
