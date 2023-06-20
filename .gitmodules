@@ -1,6 +1,7 @@
 [submodule "src/SparkFun_VL53L5CX_Arduino_Library"]
 	path = src/SparkFun_VL53L5CX_Arduino_Library
 	url = https://github.com/polyhobbyist/SparkFun_VL53L5CX_Arduino_Library
+	branch = humble
 [submodule "src/wiring_for_ros"]
 	path = src/wiring_for_ros
 	url = https://github.com/polyhobbyist/wiring_for_ros.git
